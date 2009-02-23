@@ -1,0 +1,123 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2551
+
+Vim - Interpreter Command Line Editor. Use vim like a front-end for edit commands and send it to an interactive interpreter open in a GNU Screen session.
+
+Features:
+
+- Command History, just like a shell
+- History save/load
+- Can send only selected text or custom selection
+
+I have been using Python, Ruby, Common Lisp, Scheme, Clojure, Ksh, and others interpreters through Vim and Vicle (and GNU Screen, of course).
+
+Usage:
+
+- Load a Screen session and then load an interpreter (ipython, irb, shell,
+  sbcl, clisp, clojure,  etc.) in the shell:
+  % screen -S rubySession
+  % irb
+  >>
+
+- Open Vim with the vicle plugin and type a command (without press ENTER):
+  puts "Ruby interpreter"
+
+- Type <C-c><C-c>  or <C-CR> or :VicleSend  to send to the interpreter the
+  current line (that can be changed by setting other Selection String).
+
+- If the identifiers of the screen are not set, you are going be asked for
+  it (put the session name and window number where your interpreter are.
+  All the windows in a Screen session have a unique number.
+  You can use TAB key for completion in the Session name):
+
+  Session name: rubySession
+  Window number: 0
+
+  In the screen window you are going to see:
+  >> puts "Ruby interpreter"
+  Ruby interpreter
+  => nil
+
+  If you disable the Edition Mode by calling the command :VicleEditionToggle
+  the <C-CR> and the other shortcut are going to send all the content of the
+  screen and after that, the screen of Vim are going to be cleared, just
+  like a normal command line.
+
+- You scroll through the commands with the key <C-Up> and <C-Down>   just
+  like the history of the shell.
+
+- Edition Mode
+  This mode do not clear the screen after send the command. Also, it send a
+  command selected by a custom Selection String that is in the variable
+
+  w:vicle_selection_string
+
+  Edition Mode is 1 (ON) by default.
+
+  By default, vicle in Edition mode send the current line.
+  Toggle the Edition Mode using the command :VicleEditionToggle
+
+  The selection string is by default "0v$y": go to column 0, enter visual
+  mode, go to the end of line and yank. Always is necesary to end with the
+  yank command "y".
+  It can be set to "{v}y" to select the current paragraph
+
+- Sending selected text using Vim's Visual Mode
+  Just select the text and press <C-CR> or <C-c><C-c> to send the selected
+  text without clear the screen. It is the same in Vicle Edition Mode and
+  Vicle Not Edicion Mode (send command and clear vim screen)
+
+  Just select the text. Vicle are going to yank it.
+
+- Usefull commands for manage the history. Use absolute paths for history files:
+  :VicleHistoryToggle   " activate or deactivate history
+  :VicleHistoryClear
+  :VicleHistorySize
+  :VicleHistorySave
+  :VicleHistoryLoad
+
+- To change the screen name and window name use the command
+  :VicleSession
+
+- Some global variables that you can define in your .vimrc:
+
+  let g:vicle_session_name    = 'normal_session_name'
+  let g:vicle_session_window  = 'normal_session_window'
+
+  let g:vicle_history_active   = 0 " deactivate history
+  let g:vicle_edition_mode     = 1 " active edition mode
+  let g:vicle_selection_string = "0v$y"  " yank current line
+
+  let g:vicle_hcs             = '~~~your_command_separator~~~'
+
+Tips:
+
+- If you want to send commands to a Ruby interpreter (irb), open a file like
+  work.rb or other with the extension .rb  or set the filetype manually
+  :set filetype=ruby
+
+ This apply to other languages supported by vim.
+
+- For use Vicle with diferent languages
+
+  autocmd FileType python let w:vicle_selection_string = "0v}y"
+  autocmd FileType lisp let w:vicle_edition_mode = 1 | let w:vicle_history_active = 0 | let w:vicle_selection_string = "v%y"
+
+- Use of rlwrap to run the interpreter
+
+  It is known that by trying and testing that running the interpreter with rlwrap improves the performances of vicle.
+
+  Clojure with rlwrap:
+  screen -S clojure rlwrap java -cp clojure.jar clojure.main
+
+- About the limit of size for the buffers to send
+
+  Vicle call many times to Screen when the buffer to send its bigger than 1000 characters. This let vicle to send really big buffers.
+
+
+Inspired On:
+
+  Slime for Vim from Jonathan Palardy
+  http://technotales.wordpress.com/2007/10/03/like-slime-for-vim/
+  and the work of Jerris Welt
+  http://www.jerri.de/blog/archives/2006/05/02/scripting_screen_for_fun_and_profit/
+
