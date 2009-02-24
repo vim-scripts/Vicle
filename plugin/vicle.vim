@@ -2,10 +2,15 @@
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
 " Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.0.0
+" Version:    1.0.1
+" Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2009-02-24:
+"   - Removed some doc
+"   - Command for send content
+"   - Fix problem with load/saving history commands
 "   2009-02-23:
 "   - Fixed a bad behavior when open/save history files
 "   2009-02-19:
@@ -14,7 +19,7 @@
 "   2009-02-18: Second release and stable version 1
 "   - Better manage of history
 "   - Commands for: clear and save history and set/get screen session vars
-"   2009-02-13: Firt realease
+"   2009-02-13: First realease
 "   - Send data to the screen session
 "   - History of commands (cyclic and without limit of size)
 "   - Multiple vicle within a vim execution (using tabedit for example)
@@ -29,7 +34,7 @@
 " - Open Vim with the vicle plugin and type a command:
 "   puts "Ruby interpreter"
 "
-" - Type <C-c><C-c>  or <C-CR>  to send to the interpreter
+" - Type <C-c><C-c>  or <C-CR> or :VicleSend  to send to the interpreter
 " - If the identifiers of the screen are not set, you are going be asked for
 "   it (put the session name and window number where your interpreter are.
 "   All the windows in a Screen session have a unique number.
@@ -47,7 +52,9 @@
 "
 " - You scroll through the commands with the key <C-Up> and <C-Down>   just
 "   like the history of the shell.
-" - Usefull commands for manage the history:
+"
+" - Usefull commands for manage the history. Use absolute paths for history
+"   files:
 "   :VicleHistoryClear
 "   :VicleHistorySize
 "   :VicleHistorySave
@@ -68,12 +75,16 @@
 "
 "   This apply to other languages supported by vim.
 "
+" Limitations:
+"   The method used for send command to the Screen session only can send
+"   approximately 4096 bytes. This is a GNU Screen's limitation.
+"
 " InspiredOn:
 "   Slime for Vim from Jonathan Palardy
 "   http://technotales.wordpress.com/2007/10/03/like-slime-for-vim/
 "   and the work of Jerris Welt
 "   http://www.jerri.de/blog/archives/2006/05/02/scripting_screen_for_fun_and_profit/
-
+"
 
 if exists('g:vicle_loaded')
     finish
@@ -88,8 +99,6 @@ endif
 "   -   -   -   -   -   -   -   -   -   -
 
 " Send the text of the screen (all) to Screen
-" TODO Separate this function and receibe lines
-
 function! Vicle_send_command()
   let l:lines= getline(0,'$')
   call Vicle_send(l:lines)
@@ -215,7 +224,7 @@ function! Vicle_history_save()
     try
       echohl Identifier
       let l:fname = input('History file (save): ', '', 'file')
-      if l:fname
+      if l:fname != ''
         echohl None
         let l:lt = []
         for l:list in w:vicle_history
@@ -242,7 +251,7 @@ function! Vicle_history_load()
   try
     echohl Identifier
     let l:fname = input('History file (load): ', '', 'file')
-    if l:fname
+    if l:fname != ''
       echohl None
       let l:lines = readfile(l:fname)
       let l:lt = []
@@ -320,6 +329,7 @@ nmap <C-Down> :call Vicle_history_move(1)<CR>
 imap <C-Down> <ESC><C-Down>
 
 " Commands
+command! -complete=command VicleSend call Vicle_send_command()
 command! -complete=command VicleSession call Vicle_session()
 command! -complete=command VicleSessionVars call Vicle_session_vars()
 command! -complete=command VicleHistoryClear call Vicle_history_clear('Vicle history cleared')
