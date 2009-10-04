@@ -2,29 +2,33 @@
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
 " Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.1
+" Version:    1.1.1
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2009-10-04:
+"   - Version 1.1.1
+"   - Removed the annoying "Press ENTER ..." by adding preceding the "exec"
+"     commands with the "silent" command.
 "   2009-10-02:
-"   - Added edition mode and more tips
+"   - Added edition mode and more tips.
 "   2009-02-24:
-"   - Removed some doc
-"   - Command for send content
-"   - Fix problem with load/saving history commands
+"   - Removed some doc.
+"   - Command for send content.
+"   - Fix problem with load/saving history commands.
 "   2009-02-23:
-"   - Fixed a bad behavior when open/save history files
+"   - Fixed a bad behavior when open/save history files.
 "   2009-02-19:
-"   - Added the documentation
-"   - Added save and load history
+"   - Added the documentation.
+"   - Added save and load history.
 "   2009-02-18: Second release and stable version 1
-"   - Better manage of history
-"   - Commands for: clear and save history and set/get screen session vars
+"   - Better manage of history.
+"   - Commands for: clear and save history and set/get screen session vars.
 "   2009-02-13: First realease
-"   - Send data to the screen session
-"   - History of commands (cyclic and without limit of size)
-"   - Multiple vicle within a vim execution (using tabedit for example)
+"   - Send data to the screen session.
+"   - History of commands (cyclic and without limit of size).
+"   - Multiple vicle within a vim execution (using tabedit for example).
 "
 " Usage:
 " - Load a Screen session and then load an interpreter (ipython, irb, shell,
@@ -33,10 +37,12 @@
 "   % irb
 "   >>
 "
-" - Open Vim with the vicle plugin and type a command:
+" - Open Vim with the vicle plugin and type a command (without press ENTER):
 "   puts "Ruby interpreter"
 "
-" - Type <C-c><C-c>  or <C-CR> or :VicleSend  to send to the interpreter
+" - Type <C-c><C-c>  or <C-CR> or :VicleSend  to send to the interpreter the
+"   current line (that can be changed by setting other Selection String).
+"
 " - If the identifiers of the screen are not set, you are going be asked for
 "   it (put the session name and window number where your interpreter are.
 "   All the windows in a Screen session have a unique number.
@@ -45,24 +51,34 @@
 "   Session name: rubySession
 "   Window number: 0
 "
-"   After that, your vim buffer are going to be empty and in insert mode for
-"   write more commands and sendit to the interpreter. In the screen window
-"   you are going to see:
+"   In the screen window you are going to see:
 "   >> puts "Ruby interpreter"
 "   Ruby interpreter
 "   => nil
 "
+"   If you disable the Edition Mode by calling the command :VicleEditionToggle
+"   the <C-CR> and the other shortcut are going to send all the content of the
+"   screen and after that, the screen of Vim are going to be cleared, just
+"   like a normal command line.
+"
 " - You scroll through the commands with the key <C-Up> and <C-Down>   just
 "   like the history of the shell.
 "
-" - Edition mode
+" - Edition Mode
 "   This mode do not clear the screen after send the command. Also, it send a
-"   command selected by a custom selection that is in the variable
+"   command selected by a custom Selection String that is in the variable
 "
 "   w:vicle_selection_string
 "
+"   Edition Mode is 1 (ON) by default.
+"
 "   By default, vicle in Edition mode send the current line.
 "   Toggle the Edition Mode using the command :VicleEditionToggle
+"
+"   The selection string is by default "0v$y": go to column 0, enter visual
+"   mode, go to the end of line and yank. Always is necesary to end with the
+"   yank command "y".
+"   It can be set to "{v}y" to select the current paragraph
 "
 " - Sending selected text using Vim's Visual Mode
 "   Just select the text and press <C-CR> or <C-c><C-c> to send the selected
@@ -87,7 +103,7 @@
 "
 "   let g:vicle_history_active   = 0 " deactivate history
 "   let g:vicle_edition_mode     = 1 " active edition mode
-"   let g:vicle_selection_string = "0v$y"  " yank complete current line
+"   let g:vicle_selection_string = "0v$y"  " yank current line
 "
 "   let g:vicle_hcs             = '~~~your_command_separator~~~'
 "
@@ -120,20 +136,11 @@ if exists('g:vicle_loaded')
 endif
 let g:vicle_loaded=1
 
-" vicle history active. If 1, the history is on, if 0, there is no history
-if !exists('w:vicle_history_active')
-  if !exists('g:vicle_history_active')
-    let w:vicle_history_active = 1
-  else
-    let w:vicle_history_active =  g:vicle_history_active
-  endif
-endif
-
 " vicle edition mode: don't clear screen, save historic, don't replace screen
 "   with historic, let send commands by programmed movement.
 if !exists('w:vicle_edition_mode')
   if !exists('g:vicle_edition_mode')
-    let w:vicle_edition_mode = 0
+    let w:vicle_edition_mode = 1
   else
     let w:vicle_edition_mode =  g:vicle_edition_mode
   endif
@@ -141,15 +148,24 @@ endif
 
 " vicle selection string, used for the edicion mode. Of course, you can use
 " what ever you like to select and finish in Visual mode to simple send the
-" command.
+" command. It is necesary to end with the "yank" letter.
 " 
 " } paragraph, % brace bracet comment, $ line, see vim movements.
-" 0V$ is: go to begin of line, enter Visual Mode, go to end of line and yank
+" 0v$y is: go to begin of line, enter Visual Mode, go to end of line and yank
 if !exists('w:vicle_selection_string')
   if !exists('g:vicle_selection_string')
     let w:vicle_selection_string = "0v$y"
   else
     let w:vicle_selection_string = g:vicle_selection_string
+  endif
+endif
+
+" vicle history active. If 1, the history is on, if 0, there is no history
+if !exists('w:vicle_history_active')
+  if !exists('g:vicle_history_active')
+    let w:vicle_history_active = 1
+  else
+    let w:vicle_history_active =  g:vicle_history_active
   endif
 endif
 
@@ -166,13 +182,13 @@ let g:vicle_visual  = 3
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 " SENDING
 
-" Send the text of the screen (all) to Screen
+" Send the text of the screen to Screen
 function! Vicle_send_command(mode)
   let l:curpos = getpos(".")
 
   exec "normal \<Esc>"
   if a:mode != g:vicle_visual
-    if w:vicle_edition_mode < 1   " send command, clear string
+    if w:vicle_edition_mode < 1
       call Vicle_send_command_noedition()
       return 0
     else
@@ -201,13 +217,14 @@ endfunction
 
 
 function! Vicle_send_command_edition()
-  exec 'normal '.w:vicle_selection_string
+  silent exec 'normal '.w:vicle_selection_string
   call Vicle_send_cero_reg()
+
 endfunction
 
 
 function! Vicle_send_selection()
-  exec "normal gvy"
+  silent exec "normal gvy"
   call Vicle_send_cero_reg()
 endfunction
  
@@ -237,14 +254,14 @@ endfunction
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
 function! Vicle_screen_clean()
-  :exec 'normal ggdG'
+  silent exec 'normal ggdG'
 endfunction
 
 function! Vicle_screen_put(lines)
   call Vicle_screen_clean()
   call append(1, a:lines)
   " Remove extra line and go to end of file
-  exec 'normal dd'
+  silent exec 'normal dd'
 endfunction
 
 " Session vars
