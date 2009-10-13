@@ -2,11 +2,14 @@
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
 " Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.1.2
+" Version:    1.1.3
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2009-10-13:
+"   - Fixed copying multiple times the same selection when sending a selected
+"     text
 "   2009-10-12:
 "   - Fixed cursor return to the last position when sending a command
 "   2009-10-04:
@@ -187,7 +190,7 @@ let g:vicle_visual  = 3
 " Send the text of the screen to Screen
 function! Vicle_send_command(mode)
   let l:curpos = getpos(".")
-  exec "normal \<Esc>"
+  
   if a:mode != g:vicle_visual
     if w:vicle_edition_mode < 1
       call Vicle_send_command_noedition()
@@ -232,11 +235,12 @@ endfunction
 function! Vicle_send_cero_reg()
   let l:lines = split(getreg('"'), "\n")
   call Vicle_send_lines(l:lines)
+  unlet l:lines
 endfunction
 
 function! Vicle_startinsert()
   startinsert
-  exec 'normal G$'
+  silent exec 'normal G$'
 endfunction
 "   -   -   -   -   -   -   -   -
 
@@ -477,13 +481,13 @@ endfunction
 if !mapcheck('<C-CR>')
   nmap <C-CR> :call Vicle_send_command(g:vicle_normal)<CR>
   imap <C-CR> <ESC>:call Vicle_send_command(g:vicle_insert)<CR><Right>
-  vmap <C-CR> :call Vicle_send_command(g:vicle_visual)<CR>
+  vmap <C-CR> <ESC>:call Vicle_send_command(g:vicle_visual)<CR>
 endif
 
 " Maps for sending
 nmap <C-c><C-c> :call Vicle_send_command(g:vicle_normal)<CR>
 imap <C-c><C-c> <ESC>:call Vicle_send_command(g:vicle_insert)<CR><Right>
-vmap <C-c><C-c> :call Vicle_send_command(g:vicle_visual)<CR>
+vmap <C-c><C-c> <ESC>:call Vicle_send_command(g:vicle_visual)<CR>
 
 " Maps for history
 nmap <C-Up> :call Vicle_history_move(-1)<CR>
