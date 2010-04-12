@@ -2,11 +2,16 @@
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
 " Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.1.3
+" Version:    1.2
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2010-04-12:
+"   - Version 1.2
+"   - Removed the size limit for the buffer to send by calling multiple times
+"     to Screen.
+"   - Fixed behavior with multiple tabs.
 "   2009-10-13:
 "   - Fixed copying multiple times the same selection when sending a selected
 "     text
@@ -73,7 +78,7 @@
 "   This mode do not clear the screen after send the command. Also, it send a
 "   command selected by a custom Selection String that is in the variable
 "
-"   w:vicle_selection_string
+"   t:vicle_selection_string
 "
 "   Edition Mode is 1 (ON) by default.
 "
@@ -121,12 +126,21 @@
 "
 " - For use Vicle with diferent languages
 "
-"   autocmd FileType python let w:vicle_selection_string = "0v}y"
-"   autocmd FileType lisp let w:vicle_edition_mode = 1 | let w:vicle_history_active = 0 | let w:vicle_selection_string = "v%y"
+"   autocmd FileType python let t:vicle_selection_string = "0v}y"
+"   autocmd FileType lisp let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y"
 "
-" Limitations:
-"   The method used for send command to the Screen session only can send
-"   approximately 4096 bytes. This is a GNU Screen's limitation.
+" - Use of rlwrap to run the interpreter
+"
+"   It is known that by trying and testing that running the interpreter with
+"   rlwrap improves the performances of vicle.
+"
+"   Clojure with rlwrap:
+"   screen -S clojure rlwrap java -cp clojure.jar clojure.main
+"
+" - About the limit of size for the buffers to send
+"   
+"   Vicle call many times to Screen when the buffer to send its bigger than
+"   1000 characters. This let vicle to send really big buffers.
 "
 " InspiredOn:
 "   Slime for Vim from Jonathan Palardy
@@ -137,42 +151,51 @@
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
 if exists('g:vicle_loaded')
-    finish
+  finish
 endif
 let g:vicle_loaded=1
 
-" vicle edition mode: don't clear screen, save historic, don't replace screen
-"   with historic, let send commands by programmed movement.
-if !exists('w:vicle_edition_mode')
-  if !exists('g:vicle_edition_mode')
-    let w:vicle_edition_mode = 1
-  else
-    let w:vicle_edition_mode =  g:vicle_edition_mode
-  endif
-endif
 
-" vicle selection string, used for the edicion mode. Of course, you can use
-" what ever you like to select and finish in Visual mode to simple send the
-" command. It is necesary to end with the "yank" letter.
-" 
-" } paragraph, % brace bracet comment, $ line, see vim movements.
-" 0v$y is: go to begin of line, enter Visual Mode, go to end of line and yank
-if !exists('w:vicle_selection_string')
-  if !exists('g:vicle_selection_string')
-    let w:vicle_selection_string = "0v$y"
-  else
-    let w:vicle_selection_string = g:vicle_selection_string
+" Private. For reload initial parameters.
+function! Vicle_up_vars()
+  if exists('t:vicle_vars_loaded')
+    return 0
   endif
-endif
+  let t:vicle_vars_loaded = 1
 
-" vicle history active. If 1, the history is on, if 0, there is no history
-if !exists('w:vicle_history_active')
-  if !exists('g:vicle_history_active')
-    let w:vicle_history_active = 1
-  else
-    let w:vicle_history_active =  g:vicle_history_active
+  " vicle edition mode: don't clear screen, save historic, don't replace screen
+  "   with historic, let send commands by programmed movement.
+  if !exists('t:vicle_edition_mode')
+    if !exists('g:vicle_edition_mode')
+      let t:vicle_edition_mode = 1
+    else
+      let t:vicle_edition_mode =  g:vicle_edition_mode
+    endif
   endif
-endif
+
+  " vicle selection string, used for the edicion mode. Of course, you can use
+  " what ever you like to select and finish in Visual mode to simple send the
+  " command. It is necesary to end with the "yank" letter.
+  " 
+  " } paragraph, % brace bracet comment, $ line, see vim movements.
+  " 0v$y is: go to begin of line, enter Visual Mode, go to end of line and yank
+  if !exists('t:vicle_selection_string')
+    if !exists('g:vicle_selection_string')
+      let t:vicle_selection_string = "0v$y"
+    else
+      let t:vicle_selection_string = g:vicle_selection_string
+    endif
+  endif
+
+  " vicle history active. If 1, the history is on, if 0, there is no history
+  if !exists('t:vicle_history_active')
+    if !exists('g:vicle_history_active')
+      let t:vicle_history_active = 1
+    else
+      let t:vicle_history_active =  g:vicle_history_active
+    endif
+  endif
+endfunc
 
 " vicle history command separator
 if !exists('g:vicle_hcs')
@@ -180,19 +203,20 @@ if !exists('g:vicle_hcs')
 endif
 
 " Internal Vars
-let g:vicle_normal  = 1
-let g:vicle_insert  = 2
-let g:vicle_visual  = 3
-
+let g:vicle_normal      = 1
+let g:vicle_insert      = 2
+let g:vicle_visual      = 3
+let g:vicle_max_buffer  = 1010  " limit of send characters
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 " SENDING
 
 " Send the text of the screen to Screen
 function! Vicle_send_command(mode)
+  call Vicle_up_vars()
   let l:curpos = getpos(".")
   
   if a:mode != g:vicle_visual
-    if w:vicle_edition_mode < 1
+    if t:vicle_edition_mode < 1
       call Vicle_send_command_noedition()
       return 0
     else
@@ -221,7 +245,7 @@ endfunction
 
 
 function! Vicle_send_command_edition()
-  silent exec 'normal '.w:vicle_selection_string
+  silent exec 'normal '.t:vicle_selection_string
   call Vicle_send_cero_reg()
 
 endfunction
@@ -246,12 +270,28 @@ endfunction
 
 function! Vicle_send_lines(lines)
   if a:lines != ['']
-    let l:text = substitute(join(a:lines, "\n") , "'", "'\\\\''", 'g'). "\n"
+    let l:text = substitute(join(a:lines, "\n") , "'", "'\\\\''", 'g') . "\n"
     call Vicle_up_svars()
-    if w:vicle_history_active > 0
+    if t:vicle_history_active > 0
       call Vicle_history_save_command(a:lines)
     endif
-    echo system('screen -S ' . w:vicle_screen_sn . ' -p ' . w:vicle_screen_wn . " -X stuff '" . l:text . "'")
+
+    " Loop for sending lines. OpenBSD only allows to send 1010 chars aprox.
+    let l:lentext = strlen(l:text)
+    let l:ltimes  = l:lentext / g:vicle_max_buffer
+    if (l:ltimes * g:vicle_max_buffer) < l:lentext
+      let l:ltimes = l:ltimes + 1
+    endif
+    let l:i = 0
+    while l:i < l:ltimes
+      let l:ttext = strpart(l:text, l:i * g:vicle_max_buffer, g:vicle_max_buffer)
+      " For debug
+      "echo 'screen -S ' . t:vicle_screen_sn . ' -p ' . t:vicle_screen_wn . " -X stuff '" . l:ttext . "'"
+      " -  -  -  -
+      echo system('screen -S ' . t:vicle_screen_sn . ' -p ' . t:vicle_screen_wn . " -X stuff '" . l:ttext . "'")
+      let l:i = l:i + 1
+    endwhile
+
     unlet l:text
   endif
 endfunction
@@ -276,16 +316,17 @@ function! Vicle_screen_sessions(A, L, P)
 endfunction
 
 function! Vicle_clean_svars()
-    unlet w:vicle_screen_sn
-    unlet w:vicle_screen_wn
+  unlet t:vicle_screen_sn
+  unlet t:vicle_screen_wn
 endfunction
 
 " Historial of commands
 function! Vicle_eh() " exists history
-  return exists('w:vicle_history')
+  return exists('t:vicle_history')
 endfunction
 
 function! Vicle_history_clear(msg)
+  call Vicle_up_vars()
   if Vicle_eh()
     if (a:msg != '')
       echohl Identifier
@@ -298,45 +339,47 @@ function! Vicle_history_clear(msg)
       endif
     endif
 
-    for l:item in w:vicle_history
-      call remove(w:vicle_history, 0)
+    for l:item in t:vicle_history
+      call remove(t:vicle_history, 0)
     endfor
-    unlet w:vicle_history
-    unlet w:vicle_h_pointer
-    unlet w:vicle_h_len
+    unlet t:vicle_history
+    unlet t:vicle_h_pointer
+    unlet t:vicle_h_len
   end
 
-  let w:vicle_history   = []
-  let w:vicle_h_pointer = 0
-  let w:vicle_h_len     = 0
+  let t:vicle_history   = []
+  let t:vicle_h_pointer = 0
+  let t:vicle_h_len     = 0
 endfunction
 
 function! Vicle_history_save_command(text)
-  call add(w:vicle_history, a:text)
-  let w:vicle_h_len     = w:vicle_h_len + 1
-  let w:vicle_h_pointer = w:vicle_h_len
+  call Vicle_up_vars()
+  call add(t:vicle_history, a:text)
+  let t:vicle_h_len     = t:vicle_h_len + 1
+  let t:vicle_h_pointer = t:vicle_h_len
 endfunction
 
 function! Vicle_history_move(ud)
-  if w:vicle_edition_mode > 0
+  call Vicle_up_vars()
+  if t:vicle_edition_mode > 0
     return 0
   endif
 
   if Vicle_eh()
-    if w:vicle_h_len > 0
+    if t:vicle_h_len > 0
       if a:ud < 1 " up
-        let w:vicle_h_pointer = w:vicle_h_pointer - 1
-        if w:vicle_h_pointer < 0
-          let w:vicle_h_pointer = w:vicle_h_len - 1
+        let t:vicle_h_pointer = t:vicle_h_pointer - 1
+        if t:vicle_h_pointer < 0
+          let t:vicle_h_pointer = t:vicle_h_len - 1
         endif
       else        " down
-        let w:vicle_h_pointer = w:vicle_h_pointer + 1
-        if !(w:vicle_h_pointer < w:vicle_h_len)
-          let w:vicle_h_pointer = 0
+        let t:vicle_h_pointer = t:vicle_h_pointer + 1
+        if !(t:vicle_h_pointer < t:vicle_h_len)
+          let t:vicle_h_pointer = 0
         endif
       endif
 
-      call Vicle_screen_put(w:vicle_history[w:vicle_h_pointer])
+      call Vicle_screen_put(t:vicle_history[t:vicle_h_pointer])
       call Vicle_startinsert()
     else
       return ''
@@ -345,9 +388,10 @@ function! Vicle_history_move(ud)
 endfunction
 
 function! Vicle_history_size()
+  call Vicle_up_vars()
   if Vicle_eh()
     let l:s = 0
-    for l:item in w:vicle_history
+    for l:item in t:vicle_history
       for l:i in l:item
         let l:s = l:s + strlen(l:i) + 2
       endfor
@@ -361,6 +405,7 @@ function! Vicle_history_size()
 endfunction
 
 function! Vicle_history_save()
+  call Vicle_up_vars()
   if Vicle_eh()
     try
       echohl Identifier
@@ -368,7 +413,7 @@ function! Vicle_history_save()
       if l:fname != ''
         echohl None
         let l:lt = []
-        for l:list in w:vicle_history
+        for l:list in t:vicle_history
           for l:i in l:list
             call add(l:lt, l:i)
           endfor
@@ -386,6 +431,7 @@ function! Vicle_history_save()
 endfunction
 
 function! Vicle_history_load()
+  call Vicle_up_vars()
   if ! Vicle_eh()
     call Vicle_history_clear('')
   endif
@@ -416,34 +462,36 @@ function! Vicle_history_load()
 endfunction
 
 function! Vicle_history_toggle()
-  if w:vicle_history_active > 0
-    let w:vicle_history_active = 0
+  call Vicle_up_vars()
+  if t:vicle_history_active > 0
+    let t:vicle_history_active = 0
   else
-    let w:vicle_history_active = 1
+    let t:vicle_history_active = 1
   endif
   echohl Comment | echon 'Vicle history active: '
-  echohl Constant | echon w:vicle_history_active
+  echohl Constant | echon t:vicle_history_active
   echohl None
 endfunc
 
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 " Up vars
 function! Vicle_up_svars()
-  if !exists('w:vicle_default_loaded')
-    let w:vicle_default_loaded = 1
+  call Vicle_up_vars()
+  if !exists('t:vicle_default_loaded')
+    let t:vicle_default_loaded = 1
     " Define the 2 vars!!
     if exists('g:vicle_session_name')
-      let w:vicle_screen_sn = g:vicle_session_name
-      let w:vicle_screen_wn = g:vicle_session_window
+      let t:vicle_screen_sn = g:vicle_session_name
+      let t:vicle_screen_wn = g:vicle_session_window
     endif
 
     call Vicle_history_clear('')
   end
 
-  if !exists('w:vicle_screen_sn') || !exists('w:vicle_screen_wn')
+  if !exists('t:vicle_screen_sn') || !exists('t:vicle_screen_wn')
     echohl Identifier
-    let w:vicle_screen_sn = input('Session name: ', '', 'custom,Vicle_screen_sessions')
-    let w:vicle_screen_wn = input('Window number: ', '0')
+    let t:vicle_screen_sn = input('Session name: ', '', 'custom,Vicle_screen_sessions')
+    let t:vicle_screen_wn = input('Window number: ', '0')
     echohl None
   end
 endfunction
@@ -451,27 +499,30 @@ endfunction
 function! Vicle_session()
   call Vicle_clean_svars()
   call Vicle_up_svars()
+  call Vicle_up_vars()
 endfunction
 
 function! Vicle_session_vars()
-  if exists('w:vicle_screen_sn')
-    echohl Comment  | echon 'Screen Session/Window: '
-    echohl Constant | echon w:vicle_screen_sn
+  call Vicle_up_vars()
+  if exists('t:vicle_screen_sn')
+    echohl Comment  | echon 'Screen Session/Windot: '
+    echohl Constant | echon t:vicle_screen_sn
     echohl Comment  | echon '/'
-    echohl Constant | echon w:vicle_screen_wn
+    echohl Constant | echon t:vicle_screen_wn
     echohl None
   endif
 endfunction
 
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 function! Vicle_edition_toggle()
-  if w:vicle_edition_mode > 0
-    let w:vicle_edition_mode = 0
+  call Vicle_up_vars()
+  if t:vicle_edition_mode > 0
+    let t:vicle_edition_mode = 0
   else
-    let w:vicle_edition_mode = 1
+    let t:vicle_edition_mode = 1
   endif
   echohl Comment | echon 'Vicle edition mode: '
-  echohl Constant | echon w:vicle_edition_mode
+  echohl Constant | echon t:vicle_edition_mode
   echohl None
 endfunction
 
