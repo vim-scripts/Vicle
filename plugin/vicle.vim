@@ -2,11 +2,20 @@
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
 " Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.2
+" Version:    1.2.1
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2010-10-15:
+"   - Version 1.2.1
+"   - Fix for OSX reported by Guy Haskin F: 
+"     "It seems like anything greater than about 380 characters fails to send
+"     corretly."
+"     Changes:
+"     You can set in your .vimrc the vicle_max_buffer to send more o less
+"     characters (by default :
+"       let g:vicle_max_buffer  = 300   " work for OSX
 "   2010-04-12:
 "   - Version 1.2
 "   - Removed the size limit for the buffer to send by calling multiple times
@@ -108,14 +117,15 @@
 "   :VicleSession
 "
 " - Some global variables that you can define in your .vimrc:
-"   let g:vicle_session_name    = 'normal_session_name'
-"   let g:vicle_session_window  = 'normal_session_window'
+"   let g:vicle_session_name      = 'normal_session_name'
+"   let g:vicle_session_window    = 'normal_session_window'
 "
-"   let g:vicle_history_active   = 0 " deactivate history
-"   let g:vicle_edition_mode     = 1 " active edition mode
-"   let g:vicle_selection_string = "0v$y"  " yank current line
+"   let g:vicle_history_active    = 0 " deactivate history
+"   let g:vicle_edition_mode      = 1 " active edition mode
+"   let g:vicle_selection_string  = "0v$y"  " yank current line
 "
-"   let g:vicle_hcs             = '~~~your_command_separator~~~'
+"   let g:vicle_hcs               = '~~~your_command_separator~~~'
+"   let g:vicle_max_buffer        = 300  " work for OSX
 "
 " Tips:
 " - If you want to send commands to a Ruby interpreter (irb), open a file like
@@ -126,8 +136,12 @@
 "
 " - For use Vicle with diferent languages
 "
+"   " We use t: variables because we can use different tabs for different
+"   " sessions.
 "   autocmd FileType python let t:vicle_selection_string = "0v}y"
 "   autocmd FileType lisp let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y"
+"
+"   autocmd FileType clojure let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y" | let t:vicle_screen_sn = "clojure" | let t:vicle_screen_wn = 0
 "
 " - Use of rlwrap to run the interpreter
 "
@@ -202,11 +216,15 @@ if !exists('g:vicle_hcs')
   let g:vicle_hcs = '~~~vvhcs~~~'
 endif
 
+" Buffer size for sending characters.
+if !exists('g:vicle_max_buffer')
+  let g:vicle_max_buffer  = 1010
+endif
+
 " Internal Vars
 let g:vicle_normal      = 1
 let g:vicle_insert      = 2
 let g:vicle_visual      = 3
-let g:vicle_max_buffer  = 1010  " limit of send characters
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 " SENDING
 
