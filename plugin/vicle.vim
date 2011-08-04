@@ -1,12 +1,29 @@
 " vicle.vim:  Vim - Interpreter Command Line Editor. Use vim like a front-end
 "             for edit commands and send it to an interactive interpreter open
 "             in a GNU Screen session.
-" Maintainer: Jose Figuero Martinez <coloso at gmail dot com>
-" Version:    1.2.1
+" Maintainer: Jose Figueroa Martinez <coloso at gmail dot com>
+"             http://buhoz.net/jose
+" Version:    1.2.2
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2011-08-03:
+"   - Version 1.2.2
+"   - Bugfix by Markus Dobler from informatik.uni-tuebingen.de:
+"       When I tried to use Vicle on my Linux machine
+"       (Ubuntu 10.4, vim 7.2.330), I got some strange errors which stated that
+"       a temporary file couldn't be opened ("E484: Can't open file 
+"       /tmp/v405904/1", the actual file name changes every time).
+"       After some debugging I think I've found the culprit:  The solution was
+"       to change the two occurences of '\n' in line 291 of your script to
+"       '\r'.  Apparently, vim interprets '\r' as (generic) newline, but '\n'
+"       sometimes gets interpreted as NUL/NL
+"       (cf. http://stackoverflow.com/questions/350661/vim-n-vs-r/350798#350798)
+"       This somehow totally confused the "system()" call and led to the weird
+"       error message.
+"         let l:text =
+"           substitute(join(a:lines, "\r") , "'", "'\\\\''", 'g') . "\r"
 "   2010-10-15:
 "   - Version 1.2.1
 "   - Fix for OSX reported by Guy Haskin F: 
@@ -288,7 +305,7 @@ endfunction
 
 function! Vicle_send_lines(lines)
   if a:lines != ['']
-    let l:text = substitute(join(a:lines, "\n") , "'", "'\\\\''", 'g') . "\n"
+    let l:text = substitute(join(a:lines, "\r") , "'", "'\\\\''", 'g') . "\r"
     call Vicle_up_svars()
     if t:vicle_history_active > 0
       call Vicle_history_save_command(a:lines)
