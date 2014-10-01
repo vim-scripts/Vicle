@@ -1,6 +1,6 @@
 This is a mirror of http://www.vim.org/scripts/script.php?script_id=2551
 
-Vim - Interpreter Command Line Editor. Use vim like a front-end for edit commands and send it to an interactive interpreter open in a GNU Screen session.
+Vim - Interpreter Command Line Editor. Use vim like a front-end for edit commands and send it to an interactive interpreter open in a GNU Screen session or tmux session.
 
 Features:
 
@@ -8,7 +8,7 @@ Features:
 - History save/load
 - Can send only selected text or custom selection
 
-I have been using Python, Ruby, Common Lisp, Scheme, Clojure, Ksh, and others interpreters through Vim and Vicle (and GNU Screen, of course).
+I have been using Python, Ruby, Common Lisp, Scheme, Clojure, Ksh, and others interpreters through Vim and Vicle (and GNU Screen or tmux).
 
 Usage:
 
@@ -80,14 +80,17 @@ Usage:
 
 - Some global variables that you can define in your .vimrc:
 
-  let g:vicle_session_name    = 'normal_session_name'
-  let g:vicle_session_window  = 'normal_session_window'
+  let g:vicle_session_sn    = 'normal_session_name'
+  let g:vicle_session_wn  = 'normal_session_window'
+   let g:vicle_use               = 'screen'       " Can be 'screen' or 'tmux'
+   let g:vicle_escape_caret      = 0    " If defined as 1 then the characters ^ will be escaped as \^
 
   let g:vicle_history_active   = 0 " deactivate history
   let g:vicle_edition_mode     = 1 " active edition mode
   let g:vicle_selection_string = "0v$y"  " yank current line
 
   let g:vicle_hcs             = '~~~your_command_separator~~~'
+  let g:vicle_max_buffer        = 300  " work for OSX
 
 Tips:
 
@@ -101,6 +104,7 @@ Tips:
 
   autocmd FileType python let w:vicle_selection_string = "0v}y"
   autocmd FileType lisp let w:vicle_edition_mode = 1 | let w:vicle_history_active = 0 | let w:vicle_selection_string = "v%y"
+  autocmd FileType clojure let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y" | let t:vicle_session_sn ="session_name" | let t:vicle_session_wn= "window_name.pane_index"
 
 - Use of rlwrap to run the interpreter
 
@@ -108,6 +112,10 @@ Tips:
 
   Clojure with rlwrap:
   screen -S clojure rlwrap java -cp clojure.jar clojure.main
+
+  Clojure with tmux:
+  tmux new-session -s code -n clojure    # session name: code, window name: clojure
+   "   In vim, session = code, window=clojure.2   if working in pane 2 of window named "clojure".
 
 - About the limit of size for the buffers to send
 

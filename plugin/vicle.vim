@@ -1,13 +1,21 @@
 " vicle.vim:  Vim - Interpreter Command Line Editor. Use vim like a front-end
 "             for edit commands and send it to an interactive interpreter open
-"             in a GNU Screen session.
+"             in a GNU Screen session or a tmux session.
 " Maintainer: Jose Figueroa Martinez <coloso at gmail dot com>
-"             http://buhoz.net/jose
-" Version:    1.2.2
+"             http://www.utm.mx/~jfigueroa
+" Version:    1.3.0
 " Require:    Vim7
 " License:    BSD
 " Os:         Linux, *Unix (both require GNU Screen)
 " History:
+"   2014-09-19:
+"   - Version 1.3
+"   - New parameters to select screen or tmux terminal emulators and to know
+"     if the caret character (^) must be escaped or not (problem reported by
+"     Stephan Sahm.
+"   - Changed the name of some parameters:
+"     - t:vicle_screen_sn to t:vicle_session_sn
+"     - t:vicle_screen_wn to t:vicle_session_wn
 "   2011-08-03:
 "   - Version 1.2.2
 "   - Bugfix by Markus Dobler from informatik.uni-tuebingen.de:
@@ -136,6 +144,10 @@
 " - Some global variables that you can define in your .vimrc:
 "   let g:vicle_session_name      = 'normal_session_name'
 "   let g:vicle_session_window    = 'normal_session_window'
+"   let g:vicle_use               = 'screen'
+"       Can be 'screen' or 'tmux'
+"   let g:vicle_escape_caret      = 0
+"       If defined as 1 then the characters ^ will be escaped as \^
 "
 "   let g:vicle_history_active    = 0 " deactivate history
 "   let g:vicle_edition_mode      = 1 " active edition mode
@@ -158,15 +170,21 @@
 "   autocmd FileType python let t:vicle_selection_string = "0v}y"
 "   autocmd FileType lisp let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y"
 "
-"   autocmd FileType clojure let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y" | let t:vicle_screen_sn = "clojure" | let t:vicle_screen_wn = 0
+"   autocmd FileType clojure let t:vicle_edition_mode = 1 | let t:vicle_history_active = 0 | let t:vicle_selection_string = "v%y" | let t:vicle_session_sn = "session_name" | let t:vicle_session_wn= "window_name.pane_index"
 "
-" - Use of rlwrap to run the interpreter
+" - Use of rlwrap to run the interpreter:
 "
 "   It is known that by trying and testing that running the interpreter with
 "   rlwrap improves the performances of vicle.
 "
 "   Clojure with rlwrap:
 "   screen -S clojure rlwrap java -cp clojure.jar clojure.main
+"
+"   Clojure with tmux:
+"   tmux new-session -s code -n clojure
+"
+"   In vim, session = code, window=clojure.2   if working in pane 2 of window
+"   named "clojure".
 "
 " - About the limit of size for the buffers to send
 "   
@@ -177,7 +195,7 @@
 "   Slime for Vim from Jonathan Palardy
 "   http://technotales.wordpress.com/2007/10/03/like-slime-for-vim/
 "   and the work of Jerris Welt
-"   http://www.jerri.de/blog/archives/2006/05/02/scripting_screen_for_fun_and_profit/
+"   http://www.jerri.de/blog/archives/2006/05/02/scripting_session_for_fun_and_profit/
 "
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
@@ -185,7 +203,6 @@ if exists('g:vicle_loaded')
   finish
 endif
 let g:vicle_loaded=1
-
 
 " Private. For reload initial parameters.
 function! Vicle_up_vars()
@@ -226,6 +243,23 @@ function! Vicle_up_vars()
       let t:vicle_history_active =  g:vicle_history_active
     endif
   endif
+
+  if !exists('t:vicle_use')
+    if !exists('g:vicle_use')
+      let t:vicle_use = 'screen'
+    else
+      let t:vicle_use =  g:vicle_use
+    endif
+  endif
+
+  if !exists('t:vicle_escape_caret')
+    if !exists('g:vicle_escape_caret')
+      let t:vicle_escape_caret = 0
+    else
+      let t:vicle_escape_caret =  g:vicle_escape_caret
+    endif
+  endif
+
 endfunc
 
 " vicle history command separator
@@ -274,7 +308,7 @@ endfunction
 function! Vicle_send_command_noedition()
   let l:lines= getline(0,'$')
   call Vicle_send_lines(l:lines)
-  call Vicle_screen_clean()
+  call Vicle_session_clean()
   call Vicle_startinsert()
 endfunction
 
@@ -306,6 +340,9 @@ endfunction
 function! Vicle_send_lines(lines)
   if a:lines != ['']
     let l:text = substitute(join(a:lines, "\r") , "'", "'\\\\''", 'g') . "\r"
+    if t:vicle_escape_caret > 0
+      let l:text = substitute(l:text, '\^', '\\\^', 'g')
+    endif
     call Vicle_up_svars()
     if t:vicle_history_active > 0
       call Vicle_history_save_command(a:lines)
@@ -321,9 +358,14 @@ function! Vicle_send_lines(lines)
     while l:i < l:ltimes
       let l:ttext = strpart(l:text, l:i * g:vicle_max_buffer, g:vicle_max_buffer)
       " For debug
-      "echo 'screen -S ' . t:vicle_screen_sn . ' -p ' . t:vicle_screen_wn . " -X stuff '" . l:ttext . "'"
+      "echo 'screen -S ' . t:vicle_session_sn . ' -p ' . t:vicle_session_wn . " -X stuff '" . l:ttext . "'"
       " -  -  -  -
-      echo system('screen -S ' . t:vicle_screen_sn . ' -p ' . t:vicle_screen_wn . " -X stuff '" . l:ttext . "'")
+      if t:vicle_use == 'screen'
+        echo system('/usr/bin/env screen -S ' . t:vicle_session_sn . ' -p ' . t:vicle_session_wn . " -X stuff '" . l:ttext . "'")
+      else
+        echo system("tmux send-keys -t " . t:vicle_session_sn . ':' . t:vicle_session_wn . " '" . l:ttext . "'")
+      endif
+"       echo conque_term#get_instance().writeln(l:ttext)
       let l:i = l:i + 1
     endwhile
 
@@ -333,12 +375,12 @@ endfunction
 
 "   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
 
-function! Vicle_screen_clean()
+function! Vicle_session_clean()
   silent exec 'normal ggdG'
 endfunction
 
-function! Vicle_screen_put(lines)
-  call Vicle_screen_clean()
+function! Vicle_session_put(lines)
+  call Vicle_session_clean()
   call append(1, a:lines)
   " Remove extra line and go to end of file
   silent exec 'normal dd'
@@ -346,13 +388,17 @@ endfunction
 
 " Session vars
 
-function! Vicle_screen_sessions(A, L, P)
-  return system("screen -ls | awk '/Attached/ {print $1}' | cut -d '.' -f 2")
+function! Vicle_session_sessions(A, L, P)
+  if t:vicle_use == 'screen'
+    return system("screen -ls | awk '/Attached/ {print $1}' | cut -d '.' -f 2")
+  else
+    return system("tmux list-sessions | awk '/attached/ {print $1}' | cut -d ':' -f 1")
+  endif
 endfunction
 
 function! Vicle_clean_svars()
-  unlet t:vicle_screen_sn
-  unlet t:vicle_screen_wn
+  unlet t:vicle_session_sn
+  unlet t:vicle_session_wn
 endfunction
 
 " Historial of commands
@@ -414,7 +460,7 @@ function! Vicle_history_move(ud)
         endif
       endif
 
-      call Vicle_screen_put(t:vicle_history[t:vicle_h_pointer])
+      call Vicle_session_put(t:vicle_history[t:vicle_h_pointer])
       call Vicle_startinsert()
     else
       return ''
@@ -516,17 +562,17 @@ function! Vicle_up_svars()
     let t:vicle_default_loaded = 1
     " Define the 2 vars!!
     if exists('g:vicle_session_name')
-      let t:vicle_screen_sn = g:vicle_session_name
-      let t:vicle_screen_wn = g:vicle_session_window
+      let t:vicle_session_sn = g:vicle_session_name
+      let t:vicle_session_wn = g:vicle_session_window
     endif
 
     call Vicle_history_clear('')
   end
 
-  if !exists('t:vicle_screen_sn') || !exists('t:vicle_screen_wn')
+  if !exists('t:vicle_session_sn') || !exists('t:vicle_session_wn')
     echohl Identifier
-    let t:vicle_screen_sn = input('Session name: ', '', 'custom,Vicle_screen_sessions')
-    let t:vicle_screen_wn = input('Window number: ', '0')
+    let t:vicle_session_sn = input('Session name: ', '', 'custom,Vicle_session_sessions')
+    let t:vicle_session_wn = input('Window number/name: ', '0')
     echohl None
   end
 endfunction
@@ -539,11 +585,11 @@ endfunction
 
 function! Vicle_session_vars()
   call Vicle_up_vars()
-  if exists('t:vicle_screen_sn')
-    echohl Comment  | echon 'Screen Session/Windot: '
-    echohl Constant | echon t:vicle_screen_sn
+  if exists('t:vicle_session_sn')
+    echohl Comment  | echon 'Screen/Tmux Session/Window: '
+    echohl Constant | echon t:vicle_session_sn
     echohl Comment  | echon '/'
-    echohl Constant | echon t:vicle_screen_wn
+    echohl Constant | echon t:vicle_session_wn
     echohl None
   endif
 endfunction
